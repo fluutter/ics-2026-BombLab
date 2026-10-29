@@ -324,12 +324,44 @@ int solve_phase_6(uint64_t challenge, char *out, size_t cap)
 
 
 
+
+
+#include <stdint.h>
+#include <stdio.h>
+
 int solve_secret(uint64_t challenge, uint64_t context, char *out, size_t cap) {
-    (void)challenge;
-    (void)context;
-    (void)out;
-    (void)cap;
-    // TODO（选做）: 根据 secret_gate、secret_copy 和 secret_phase 的汇编构造完整的第七行，写入 out 后返回 0。
-    // 第七行不一定只有整数，可以直接用 snprintf 写入；还没完成时保持返回 1，测试会显示 not attempted。
-    return 1;
+    if (out == NULL || cap == 0) {
+        return 1;
+    }
+
+    /* secret_phase 的 r12 来自 challenge，r13 来自 context。 */
+    uint32_t challenge_fold =
+        (uint32_t)challenge ^ (uint32_t)(challenge >> 32);
+    uint32_t context_fold =
+        (uint32_t)context ^ (uint32_t)(context >> 32);
+
+    uint32_t a = (uint32_t)context & 3u;
+
+    uint32_t mix_input = challenge_fold ^ context_fold;
+    uint32_t rotated = (mix_input << 5) | (mix_input >> 27);
+    uint32_t mixed = (rotated + 0xc727u) ^ 0x72u;
+
+    uint32_t r9 = (a * 0xc727u) ^ (uint32_t)(context >> 16);
+    uint32_t b = mixed ^ r9;
+
+    uint32_t check =
+        context_fold + a + 0x72u + (challenge_fold >> 5);
+    uint32_t d = b ^ check;
+
+    int n = snprintf(
+        out, cap,
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOPEN %u %u %u",
+        (unsigned)a, (unsigned)b, (unsigned)d
+    );
+
+    if (n < 0 || (size_t)n >= cap) {
+        return 1;
+    }
+
+    return 0;
 }
